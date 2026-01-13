@@ -1,14 +1,15 @@
 import { Router } from 'express';
-import { AuthController } from '../controllers/AuthController';
-import { validate } from '../middlewares/validate';
-import { loginSchema, registerSchema } from '../schemas/auth.schema';
+import { AuthController } from '../controllers/auth.controller';
+import { strictRateLimiter } from '../middlewares/rateLimiter';
+import { authenticate } from '../middlewares/auth';
 
 const router = Router();
 const authController = new AuthController();
 
-router.post('/register', validate(registerSchema), authController.register);
-router.post('/login', validate(loginSchema), authController.login);
+router.post('/register', authController.register);
+router.post('/login', strictRateLimiter, authController.login);
 router.post('/refresh', authController.refreshToken);
-router.post('/logout', authController.logout);
+router.get('/me', authenticate, authController.getCurrentUser);
+router.post('/logout', authenticate, authController.logout);
 
 export default router;
