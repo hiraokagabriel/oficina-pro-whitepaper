@@ -5,10 +5,11 @@ import { WorkOrderModal } from './components/WorkOrderModal';
 import { ClientsTab } from './components/ClientsTab';
 import { FinancialDashboard } from './components/FinancialDashboard';
 import { SettingsTab } from './components/SettingsTab';
+import { ReportsTab } from './components/ReportsTab';
 import './styles/globals.css';
 import './styles/App.css';
 
-type TabType = 'kanban' | 'clients' | 'financial' | 'settings';
+type TabType = 'kanban' | 'clients' | 'financial' | 'reports' | 'settings';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
@@ -51,6 +52,12 @@ function AppContent() {
           💰 Financeiro
         </button>
         <button
+          className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          📊 Relatórios
+        </button>
+        <button
           className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
@@ -63,6 +70,7 @@ function AppContent() {
         {activeTab === 'kanban' && <KanbanBoard />}
         {activeTab === 'clients' && <ClientsTab />}
         {activeTab === 'financial' && <FinancialDashboard />}
+        {activeTab === 'reports' && <ReportsTab />}
         {activeTab === 'settings' && <SettingsTab />}
       </main>
 
