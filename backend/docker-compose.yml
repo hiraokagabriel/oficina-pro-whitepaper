@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: oficina_pro_db
+    environment:
+      POSTGRES_USER: oficinapro
+      POSTGRES_PASSWORD: oficinapro123
+      POSTGRES_DB: oficina_pro_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - oficina_network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U oficinapro']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oficina_pro_backend
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://oficinapro:oficinapro123@postgres:5432/oficina_pro_db?schema=public
+      JWT_SECRET: super-secret-jwt-key-change-in-production-min-32-chars
+      JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production-32
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - oficina_network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  oficina_network:
+    driver: bridge
