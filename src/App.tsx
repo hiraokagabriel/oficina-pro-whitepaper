@@ -4,6 +4,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { WorkOrderModal } from './components/WorkOrderModal';
 import { ClientsTab } from './components/ClientsTab';
 import { FinancialDashboard } from './components/FinancialDashboard';
+import { SettingsTab } from './components/SettingsTab';
 import './styles/globals.css';
 import './styles/App.css';
 
@@ -62,12 +63,7 @@ function AppContent() {
         {activeTab === 'kanban' && <KanbanBoard />}
         {activeTab === 'clients' && <ClientsTab />}
         {activeTab === 'financial' && <FinancialDashboard />}
-        {activeTab === 'settings' && (
-          <div className="settings-placeholder">
-            <h2>⚙️ Configurações</h2>
-            <p>Funcionalidade de configurações em desenvolvimento...</p>
-          </div>
-        )}
+        {activeTab === 'settings' && <SettingsTab />}
       </main>
 
       {/* Modals */}
