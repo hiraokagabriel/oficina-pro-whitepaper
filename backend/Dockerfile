@@ -1,45 +1,45 @@
-# Multi-stage build for production
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS base
 
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY prisma ./prisma/
-
-# Install dependencies
+COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Copy source code
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build
+# Build TypeScript
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine AS production
-
+# Production image
+FROM base AS runner
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+ENV NODE_ENV production
 
-# Install production dependencies only
-RUN npm ci --only=production
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
 
-# Copy built files and prisma
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Create logs directory
-RUN mkdir -p logs
+RUN chown -R nodejs:nodejs /app
 
-# Expose port
-EXPOSE 3001
+USER nodejs
 
-# Start server
+EXPOSE 3333
+
+ENV PORT 3333
+
 CMD ["node", "dist/server.js"]
