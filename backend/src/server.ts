@@ -1,59 +1,42 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import { config } from './config/config';
-import { errorHandler } from './middlewares/errorHandler';
-import { rateLimiter } from './middlewares/rateLimiter';
+import dotenv from 'dotenv';
+import app from './app';
 import { logger } from './utils/logger';
-import routes from './routes';
 
-const app = express();
+// Load environment variables
+dotenv.config();
 
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: config.corsOrigin,
-  credentials: true,
-}));
+const PORT = process.env.PORT || 3333;
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+const server = app.listen(PORT, () => {
+  logger.info(`🚀 Server running on port ${PORT}`);
+  logger.info(`📚 API Docs: http://localhost:${PORT}/api-docs`);
+  logger.info(`🏥 Health Check: http://localhost:${PORT}/health`);
+});
 
-// Logging
-app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
-
-// Rate limiting
-app.use(rateLimiter);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: config.nodeEnv,
+// Graceful shutdown
+const gracefulShutdown = (signal: string) => {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+  
+  server.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
   });
+
+  // Force shutdown after 10s
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// API routes
-app.use('/api/v1', routes);
-
-// Error handling
-app.use(errorHandler);
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
 });
-
-const PORT = config.port || 3001;
-
-app.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT} in ${config.nodeEnv} mode`);
-  logger.info(`📊 Health check: http://localhost:${PORT}/health`);
-  logger.info(`🔗 API: http://localhost:${PORT}/api/v1`);
-});
-
-export default app;
