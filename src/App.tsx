@@ -6,6 +6,8 @@ import { ClientsTab } from './components/ClientsTab';
 import { FinancialDashboard } from './components/FinancialDashboard';
 import { SettingsTab } from './components/SettingsTab';
 import { ReportsTab } from './components/ReportsTab';
+import { ToastContainer } from './components/Toast';
+import { useToast } from './hooks/useToast';
 import './styles/globals.css';
 import './styles/App.css';
 
@@ -14,9 +16,13 @@ type TabType = 'kanban' | 'clients' | 'financial' | 'reports' | 'settings';
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
   const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
+  const { toasts, removeToast } = useToast();
 
   return (
     <div className="app-container">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
       {/* Header */}
       <header className="app-header">
         <div className="app-header-content">
