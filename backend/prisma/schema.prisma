@@ -1,0 +1,415 @@
+// Oficina PRO ERP - Database Schema
+// Designed for scalability and future expansion
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// USER MANAGEMENT & AUTHENTICATION
+// ========================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(MECHANIC)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workOrders     WorkOrder[]      @relation("AssignedWorkOrders")
+  createdOrders  WorkOrder[]      @relation("CreatedWorkOrders")
+  ledgerEntries  LedgerEntry[]
+  activityLogs   ActivityLog[]
+  refreshTokens  RefreshToken[]
+
+  @@index([email])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MECHANIC
+  RECEPTIONIST
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ========================================
+// CLIENT MANAGEMENT
+// ========================================
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  email     String?
+  cpf       String?  @unique
+  cnpj      String?  @unique
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workOrders WorkOrder[]
+  vehicles   Vehicle[]
+
+  @@index([name])
+  @@index([phone])
+  @@index([cpf])
+  @@index([cnpj])
+  @@map("clients")
+}
+
+// ========================================
+// VEHICLE MANAGEMENT
+// ========================================
+
+model Vehicle {
+  id           String   @id @default(uuid())
+  clientId     String
+  plate        String   @unique
+  brand        String
+  model        String
+  year         Int?
+  color        String?
+  vin          String?  @unique
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  workOrders  WorkOrder[]
+
+  @@index([clientId])
+  @@index([plate])
+  @@map("vehicles")
+}
+
+// ========================================
+// WORK ORDER MANAGEMENT
+// ========================================
+
+model WorkOrder {
+  id              String          @id @default(uuid())
+  clientId        String
+  vehicleId       String?
+  vehicleDesc     String?         // Fallback if no vehicle record
+  assignedToId    String?
+  createdById     String
+  status          WorkOrderStatus @default(ORCAMENTO)
+  totalValue      Float           @default(0)
+  discountPercent Float           @default(0)
+  discountValue   Float           @default(0)
+  finalValue      Float           @default(0)
+  publicNotes     String?
+  internalNotes   String?
+  approvedAt      DateTime?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  client       Client            @relation(fields: [clientId], references: [id])
+  vehicle      Vehicle?          @relation(fields: [vehicleId], references: [id])
+  assignedTo   User?             @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
+  createdBy    User              @relation("CreatedWorkOrders", fields: [createdById], references: [id])
+  items        WorkOrderItem[]
+  attachments  Attachment[]
+  statusHistory StatusHistory[]
+
+  @@index([clientId])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([assignedToId])
+  @@map("work_orders")
+}
+
+enum WorkOrderStatus {
+  ORCAMENTO
+  APROVADO
+  EM_SERVICO
+  FINALIZADO
+  CANCELADO
+}
+
+model WorkOrderItem {
+  id          String         @id @default(uuid())
+  workOrderId String
+  type        ItemType
+  serviceId   String?
+  partId      String?
+  description String
+  quantity    Float          @default(1)
+  unitPrice   Float
+  totalPrice  Float
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  service   Service?  @relation(fields: [serviceId], references: [id])
+  part      Part?     @relation(fields: [partId], references: [id])
+
+  @@index([workOrderId])
+  @@index([serviceId])
+  @@index([partId])
+  @@map("work_order_items")
+}
+
+enum ItemType {
+  SERVICE
+  PART
+}
+
+// ========================================
+// SERVICES & PARTS CATALOG
+// ========================================
+
+model ServiceCategory {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  services Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id          String    @id @default(uuid())
+  categoryId  String?
+  name        String
+  description String?
+  price       Float
+  duration    Int?      // minutes
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  category       ServiceCategory? @relation(fields: [categoryId], references: [id])
+  workOrderItems WorkOrderItem[]
+
+  @@index([categoryId])
+  @@index([name])
+  @@map("services")
+}
+
+model PartCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parts Part[]
+
+  @@map("part_categories")
+}
+
+model Part {
+  id             String    @id @default(uuid())
+  categoryId     String?
+  code           String    @unique
+  name           String
+  description    String?
+  brand          String?
+  price          Float
+  cost           Float?
+  stock          Int       @default(0)
+  minStock       Int       @default(0)
+  unit           String    @default("un")
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  category         PartCategory?  @relation(fields: [categoryId], references: [id])
+  workOrderItems   WorkOrderItem[]
+  stockMovements   StockMovement[]
+
+  @@index([categoryId])
+  @@index([code])
+  @@index([name])
+  @@map("parts")
+}
+
+// ========================================
+// INVENTORY MANAGEMENT
+// ========================================
+
+model StockMovement {
+  id          String           @id @default(uuid())
+  partId      String
+  type        MovementType
+  quantity    Int
+  unitPrice   Float?
+  totalValue  Float?
+  reason      String?
+  reference   String?
+  createdAt   DateTime         @default(now())
+
+  part Part @relation(fields: [partId], references: [id])
+
+  @@index([partId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+enum MovementType {
+  ENTRADA
+  SAIDA
+  AJUSTE
+  PERDA
+}
+
+// ========================================
+// FINANCIAL MANAGEMENT
+// ========================================
+
+model LedgerEntry {
+  id          String      @id @default(uuid())
+  type        EntryType
+  categoryId  String?
+  description String
+  amount      Float
+  date        DateTime    @default(now())
+  reference   String?     // Link to work order, invoice, etc.
+  isPaid      Boolean     @default(true)
+  paymentDate DateTime?
+  paymentMethod String?
+  notes       String?
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  category  FinancialCategory? @relation(fields: [categoryId], references: [id])
+  createdBy User               @relation(fields: [createdById], references: [id])
+
+  @@index([type])
+  @@index([date])
+  @@index([categoryId])
+  @@index([createdById])
+  @@map("ledger_entries")
+}
+
+enum EntryType {
+  RECEITA
+  DESPESA
+}
+
+model FinancialCategory {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  type      EntryType
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  entries LedgerEntry[]
+
+  @@index([type])
+  @@map("financial_categories")
+}
+
+// ========================================
+// ATTACHMENTS & MEDIA
+// ========================================
+
+model Attachment {
+  id          String   @id @default(uuid())
+  workOrderId String
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  url         String
+  createdAt   DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+  @@map("attachments")
+}
+
+// ========================================
+// AUDIT & LOGGING
+// ========================================
+
+model StatusHistory {
+  id          String          @id @default(uuid())
+  workOrderId String
+  fromStatus  WorkOrderStatus?
+  toStatus    WorkOrderStatus
+  changedAt   DateTime        @default(now())
+  notes       String?
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+  @@index([changedAt])
+  @@map("status_history")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String?
+  changes   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ========================================
+// SYSTEM CONFIGURATION
+// ========================================
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
