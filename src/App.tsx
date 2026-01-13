@@ -3,6 +3,7 @@ import { DatabaseProvider } from './context/DatabaseContext';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ActiveTab, WorkOrder, UIState } from './types/index';
 import './styles/globals.css';
+import './styles/App.css';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('workshop');
