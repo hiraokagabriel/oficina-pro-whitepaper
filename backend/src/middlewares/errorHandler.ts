@@ -1,58 +1,53 @@
 import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
-import { ZodError } from 'zod';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/AppError';
 
 export const errorHandler = (
-  err: Error,
+  error: Error,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  logger.error(`Error: ${err.message}`);
-  logger.debug(`Stack: ${err.stack}`);
+  logger.error('Error:', error);
 
-  // App Error (custom)
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      error: err.message,
-      code: err.code,
-      ...(err.details && { details: err.details }),
+  if (error instanceof AppError) {
+    return res.status(error.statusCode).json({
+      success: false,
+      message: error.message,
+      errors: error.errors,
     });
   }
 
-  // Zod Validation Error
-  if (err instanceof ZodError) {
+  // Prisma errors
+  if (error.name === 'PrismaClientKnownRequestError') {
     return res.status(400).json({
-      error: 'Validation error',
-      details: err.errors,
+      success: false,
+      message: 'Database error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 
-  // Prisma Errors
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    switch (err.code) {
-      case 'P2002':
-        return res.status(409).json({
-          error: 'Unique constraint violation',
-          field: err.meta?.target,
-        });
-      case 'P2025':
-        return res.status(404).json({
-          error: 'Record not found',
-        });
-      default:
-        return res.status(400).json({
-          error: 'Database error',
-          code: err.code,
-        });
-    }
+  // Validation errors
+  if (error.name === 'ZodError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation error',
+      errors: (error as any).errors,
+    });
+  }
+
+  // JWT errors
+  if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+    });
   }
 
   // Default error
   return res.status(500).json({
-    error: 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { message: err.message }),
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 };

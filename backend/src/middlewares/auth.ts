@@ -1,19 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { config } from '../config/config';
 import { AppError } from '../utils/AppError';
-import { UserRole } from '@prisma/client';
+import { prisma } from '../config/database';
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: UserRole;
-  };
+interface JwtPayload {
+  userId: string;
+  role: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: string;
+      };
+    }
+  }
 }
 
 export const authenticate = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -21,38 +29,39 @@ export const authenticate = async (
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw AppError.unauthorized('No token provided');
+      throw new AppError('No token provided', 401);
     }
 
-    const token = authHeader.substring(7);
+    const token = authHeader.split(' ')[1];
+    const secret = process.env.JWT_SECRET || 'default-secret';
 
-    const decoded = jwt.verify(token, config.jwt.secret) as {
-      id: string;
-      email: string;
-      role: UserRole;
-    };
+    const decoded = jwt.verify(token, secret) as JwtPayload;
 
-    req.user = decoded;
+    // Verify user still exists and is active
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new AppError('User not found or inactive', 401);
+    }
+
+    req.user = user;
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(AppError.unauthorized('Invalid token'));
-    } else if (error instanceof jwt.TokenExpiredError) {
-      next(AppError.unauthorized('Token expired'));
-    } else {
-      next(error);
-    }
+    next(error);
   }
 };
 
-export const authorize = (...roles: UserRole[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authorize = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return next(AppError.unauthorized());
+      return next(new AppError('Not authenticated', 401));
     }
 
     if (!roles.includes(req.user.role)) {
-      return next(AppError.forbidden('Insufficient permissions'));
+      return next(new AppError('Not authorized', 403));
     }
 
     next();
