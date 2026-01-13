@@ -92,7 +92,7 @@ export function exportToJSON(
   downloadFile(json, filename, 'application/json');
 }
 
-private function downloadFile(
+function downloadFile(
   content: string,
   filename: string,
   mimeType: string
