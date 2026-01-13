@@ -1,52 +1,84 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
-    container_name: oficina_pro_db
+    image: postgres:16-alpine
+    container_name: oficina-pro-db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: oficinapro
-      POSTGRES_PASSWORD: oficinapro123
-      POSTGRES_DB: oficina_pro_db
+      POSTGRES_USER: oficina
+      POSTGRES_PASSWORD: oficina123
+      POSTGRES_DB: oficinapro
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - oficina_network
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U oficinapro']
+      test: ['CMD-SHELL', 'pg_isready -U oficina -d oficinapro']
       interval: 10s
       timeout: 5s
       retries: 5
 
-  backend:
+  # Redis Cache (optional, for sessions/cache)
+  redis:
+    image: redis:7-alpine
+    container_name: oficina-pro-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: oficina_pro_backend
-    environment:
-      NODE_ENV: development
-      PORT: 3001
-      DATABASE_URL: postgresql://oficinapro:oficinapro123@postgres:5432/oficina_pro_db?schema=public
-      JWT_SECRET: super-secret-jwt-key-change-in-production-min-32-chars
-      JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production-32
-      CORS_ORIGIN: http://localhost:5173
+    container_name: oficina-pro-api
+    restart: unless-stopped
+    env_file:
+      - .env
     ports:
-      - '3001:3001'
+      - '3333:3333'
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
-      - .:/app
-      - /app/node_modules
-    networks:
-      - oficina_network
+      - ./src:/app/src
+      - ./uploads:/app/uploads
     command: npm run dev
+
+  # PgAdmin (Database Management UI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: oficina-pro-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@oficinapro.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - '5050:80'
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
 
 networks:
-  oficina_network:
-    driver: bridge
+  default:
+    name: oficina-pro-network
