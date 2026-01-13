@@ -1,18 +1,17 @@
 import { Router } from 'express';
-import { UserController } from '../controllers/UserController';
+import { UserController } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 
 const router = Router();
-const userController = new UserController();
+const controller = new UserController();
 
-// All routes require authentication
 router.use(authenticate);
+router.use(authorize('ADMIN', 'MANAGER'));
 
-router.get('/me', userController.getProfile);
-router.get('/', authorize('ADMIN', 'MANAGER'), userController.list);
-router.get('/:id', authorize('ADMIN', 'MANAGER'), userController.getById);
-router.put('/me', userController.updateProfile);
-router.put('/:id', authorize('ADMIN'), userController.update);
-router.delete('/:id', authorize('ADMIN'), userController.delete);
+router.get('/', controller.list);
+router.get('/:id', controller.getById);
+router.post('/', authorize('ADMIN'), controller.create);
+router.put('/:id', controller.update);
+router.delete('/:id', authorize('ADMIN'), controller.delete);
 
 export default router;

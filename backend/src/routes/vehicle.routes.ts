@@ -1,16 +1,16 @@
 import { Router } from 'express';
-import { VehicleController } from '../controllers/VehicleController';
-import { authenticate } from '../middlewares/auth';
+import { VehicleController } from '../controllers/vehicle.controller';
+import { authenticate, authorize } from '../middlewares/auth';
 
 const router = Router();
-const vehicleController = new VehicleController();
+const controller = new VehicleController();
 
 router.use(authenticate);
 
-router.get('/', vehicleController.list);
-router.get('/:id', vehicleController.getById);
-router.post('/', vehicleController.create);
-router.put('/:id', vehicleController.update);
-router.delete('/:id', vehicleController.delete);
+router.get('/', controller.list);
+router.get('/:id', controller.getById);
+router.post('/', authorize('ADMIN', 'MANAGER', 'RECEPTIONIST'), controller.create);
+router.put('/:id', authorize('ADMIN', 'MANAGER', 'RECEPTIONIST'), controller.update);
+router.delete('/:id', authorize('ADMIN', 'MANAGER'), controller.delete);
 
 export default router;

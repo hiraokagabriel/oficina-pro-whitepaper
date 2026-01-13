@@ -1,19 +1,17 @@
 import { Router } from 'express';
-import { ClientController } from '../controllers/ClientController';
+import { ClientController } from '../controllers/client.controller';
 import { authenticate, authorize } from '../middlewares/auth';
-import { validate } from '../middlewares/validate';
-import { createClientSchema, updateClientSchema } from '../schemas/client.schema';
 
 const router = Router();
-const clientController = new ClientController();
+const controller = new ClientController();
 
-// All routes require authentication
 router.use(authenticate);
 
-router.get('/', clientController.list);
-router.get('/:id', clientController.getById);
-router.post('/', validate(createClientSchema), clientController.create);
-router.put('/:id', validate(updateClientSchema), clientController.update);
-router.delete('/:id', authorize('ADMIN', 'MANAGER'), clientController.delete);
+router.get('/statistics', controller.getStatistics);
+router.get('/', controller.list);
+router.get('/:id', controller.getById);
+router.post('/', authorize('ADMIN', 'MANAGER', 'RECEPTIONIST'), controller.create);
+router.put('/:id', authorize('ADMIN', 'MANAGER', 'RECEPTIONIST'), controller.update);
+router.delete('/:id', authorize('ADMIN', 'MANAGER'), controller.delete);
 
 export default router;
